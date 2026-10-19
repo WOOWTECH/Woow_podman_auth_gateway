@@ -28,6 +28,6 @@ ADR-0005 把 H618 規格改成「基底 + H4G 疊加層」，由 `restore.sh` �
 ## 後果
 
 - `restore.sh`（#50）要依這組名稱建立 podman secret、安裝基底 quadlet，H4G 再裝 drop-in；主機不再需要 `woow-gateway` 帳號與 `/opt/woow-deploy/overlays/woow-auth-gateway/`。
-- quadlet 的 `Image=` 在發佈後才補得上 digest，所以每次發佈是三步：改 tag、打 git tag 發佈、補 digest。
+- quadlet 的 `Image=` 在發佈後才補得上 digest，所以每次發佈是三步，都在 release PR 的分支上：改 tag、在分支上打 git tag 發佈、補 digest 後才合併。main 上不會出現只有 tag 的 `Image=`，`image` workflow 也以此為合併門檻。
 - ticket 的防重放紀錄只在記憶體，容器重啟後清空；ticket 只有 45 秒，可以接受。要在重啟後保留不在本 ADR 範圍。
 - 新增 target 要同步改五個地方（README 列出），協定版本隨之升級。

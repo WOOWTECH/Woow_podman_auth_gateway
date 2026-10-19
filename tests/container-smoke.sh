@@ -42,6 +42,10 @@ podman run --rm --network none --entrypoint sh "$IMAGE" -c '
             -not -path "/proc/*" -not -path "/sys/*" -not -path "/usr/lib/python3*" \
             -not -path "/usr/share/*" -not -path "/etc/ssl/*" 2>/dev/null)
   if [ -n "$found" ]; then echo "secret-looking files in the image:" >&2; echo "$found" >&2; exit 1; fi
+  # The key is 32+ bytes of hex: look for one wherever an operator or a build step could
+  # have left a file (Debian packages are checked by name above, not by content).
+  hex=$(grep -rlE "[0-9a-fA-F]{64}" /usr/local /etc /opt /root /home /srv /tmp /var/tmp /run 2>/dev/null)
+  if [ -n "$hex" ]; then echo "files holding a 64-hex string:" >&2; echo "$hex" >&2; exit 1; fi
 ' || fail "the image carries a secret"
 
 echo "== unit tests against the image's aiohttp"

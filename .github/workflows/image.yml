@@ -22,6 +22,16 @@ jobs:
           sudo apt-get install -y podman shellcheck
           podman --version
 
+      # Hosts pull by tag and arm64 manifest digest. A release PR is tagged and published
+      # from its branch first (publish.yml), then pins the digest here, so main never
+      # carries a tag-only Image=.
+      - name: The quadlet pins the image by tag and digest
+        run: |
+          grep -Eq '^Image=ghcr\.io/woowtech/woow-auth-gateway:[0-9]+\.[0-9]+\.[0-9]+-r[0-9]+@sha256:[0-9a-f]{64}$' quadlet/woow-auth-gateway.container || {
+            echo "quadlet/woow-auth-gateway.container: Image= must be <tag>@sha256:<arm64 digest> (see README, 版本與發佈)" >&2
+            exit 1
+          }
+
       - name: shellcheck
         run: shellcheck tests/*.sh
 

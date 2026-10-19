@@ -83,11 +83,13 @@ tag 規則是 `<協定版本>-r<N>`，例如 `1.0.0-r1`：
 
 發佈步驟：
 
-1. 在 PR 裡把 `quadlet/woow-auth-gateway.container` 的 `Image=` 改成新 tag（先不帶 digest），合併。
-2. 在 main 上打 tag 並推：`git tag 1.0.0-r2 && git push origin 1.0.0-r2`。`publish` workflow 在 `ubuntu-24.04-arm` 建置、跑完 smoke test 後推到 `ghcr.io/woowtech/woow-auth-gateway:<tag>`，用 skopeo 確認是 arm64，GitHub release 記錄 `IMAGE:TAG@digest`。tag 和 quadlet 不一致、或 ghcr 已有這個 tag，都會拒絕。
-3. 把 release 記錄的 digest 補進 `Image=`（`…:<tag>@sha256:…`）再 commit。主機一律依 tag 加 digest 拉取。
+發佈在 release PR 的分支上完成，main 上的 `Image=` 永遠是 tag 加 digest：
 
-已發佈的 tag 不會被覆寫；要重發就升 `-rN`。
+1. 開 release 分支，把 `quadlet/woow-auth-gateway.container` 的 `Image=` 改成新 tag（這時還沒有 digest），推上去開 PR。此時 `image` workflow 的「The quadlet pins the image by tag and digest」會失敗，這是預期的，它就是合併的門檻。
+2. 在這個分支的 HEAD 打 tag 並推：`git tag 1.0.0-r2 && git push origin 1.0.0-r2`。`publish` workflow 在 `ubuntu-24.04-arm` 建置、跑完 smoke test 後推到 `ghcr.io/woowtech/woow-auth-gateway:<tag>`，用 skopeo 確認是 arm64，GitHub release 記錄 `IMAGE:TAG@digest`。tag 和 quadlet 不一致、ghcr 已有這個 tag、或查不出 ghcr 上有沒有這個 tag，都會拒絕。
+3. 在同一個分支把 release 記錄的 digest 補進 `Image=`（`…:<tag>@sha256:…`），CI 轉綠後合併。主機一律依 tag 加 digest 拉取。
+
+已發佈的 tag 不會被覆寫；要重發就升 `-rN`。如果推上 ghcr 之後建立 release 失敗，重跑會被「tag 已存在」擋下，這時依 run 紀錄裡的 digest 手動 `gh release create`。
 
 ## 測試
 

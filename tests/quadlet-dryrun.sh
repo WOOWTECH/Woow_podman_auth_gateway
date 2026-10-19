@@ -40,8 +40,10 @@ expect_exec() {
     *" ghcr.io/woowtech/woow-auth-gateway:"*" $2") ;;
     *) echo "expected the image followed by '$2'" >&2; return 1 ;;
   esac
-  for want in --network host --secret "woow-ingress-secret,type=mount,target=ingress-secret,uid=10001,gid=10001,mode=0400" --read-only; do
-    grep -qF -- "$want" <<<"$exec" || { echo "missing $want" >&2; return 1; }
+  local secret want
+  secret=$(sed -n 's/^Secret=//p' "$REPO/quadlet/woow-auth-gateway.container")
+  for want in "--network host" "--secret $secret" "--read-only"; do
+    grep -qF -- " $want " <<<"$exec " || { echo "missing '$want'" >&2; return 1; }
   done
 }
 
