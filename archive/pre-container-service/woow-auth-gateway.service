@@ -1,0 +1,30 @@
+[Unit]
+Description=Home Assistant authenticated gateway for Pi Web and Tailscale Web
+After=network-online.target tailscale-web.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=woow-gateway
+Group=woow-gateway
+ExecStart=/usr/bin/python3 /opt/woow-deploy/overlays/woow-auth-gateway/woow_auth_gateway.py --secret-file /opt/homeassistant/.woow_ingress_secret --pi-upstream http://127.0.0.1:30141
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
