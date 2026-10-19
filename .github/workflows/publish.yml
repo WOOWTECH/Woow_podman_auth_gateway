@@ -1,6 +1,8 @@
 # Publish gate: build the arm64 image natively and push it to GHCR under the tag the
 # quadlet names, then record the arm64 manifest digest. Hosts pull by tag and that digest
 # (woow_ha_version_control ADR-0005), so the digest is the release, the tag only names it.
+# The same release carries the HA component as woow_protected_apps-<tag>.tar.gz and records
+# its sha256, which restore.sh checks before installing it.
 #
 # Trigger: push a git tag equal to the quadlet's image tag, e.g. `git tag 1.0.0-r1`.
 # A tag already on GHCR is never overwritten; bump -rN instead.
@@ -60,7 +62,7 @@ jobs:
           fi
 
       - name: shellcheck
-        run: shellcheck tests/*.sh
+        run: shellcheck tests/*.sh ha/*.sh
 
       - name: Quadlet dry-run (base and H4G drop-in)
         run: tests/quadlet-dryrun.sh
@@ -79,6 +81,13 @@ jobs:
       # The image is public: the signing key must come from the host's podman secret.
       - name: Smoke test (user, arch, no secret, unit tests, ports)
         run: tests/container-smoke.sh "$IMAGE:$TAG"
+
+      - name: HA component asset
+        run: |
+          asset=$(ha/build-asset.sh "$TAG" "$RUNNER_TEMP/asset")
+          tests/ha-asset-check.sh "$asset"
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+          echo "ASSET_SHA256=$(sha256sum "$asset" | cut -d' ' -f1)" >> "$GITHUB_ENV"
 
       - name: Push and record the arm64 manifest digest
         run: |
@@ -108,7 +117,13 @@ jobs:
           $IMAGE:$TAG@$DIGEST
           \`\`\`
 
+          HA component \`$(basename "$ASSET")\` (unpacks to \`custom_components/woow_protected_apps/\`), sha256:
+
+          \`\`\`
+          $ASSET_SHA256  $(basename "$ASSET")
+          \`\`\`
+
           Built from $GITHUB_SHA on ubuntu-24.04-arm.
           EOF
           cat notes.md >> "$GITHUB_STEP_SUMMARY"
-          gh release create "$TAG" --title "$TAG" --notes-file notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file notes.md "$ASSET"

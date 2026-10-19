@@ -1,0 +1,5 @@
+# HA core 2026.7.2, the version the H618 base pins (woow_ha_version_control ADR-0005).
+# Bump together with the HA image the hosts run.
+pytest-homeassistant-custom-component==0.13.346
+# panel_custom depends on frontend; the version HA 2026.7.2 pins (package_constraints.txt).
+home-assistant-frontend==20260624.5

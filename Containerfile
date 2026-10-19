@@ -3,7 +3,7 @@
 # Base: debian:bookworm-slim, pinned to the digest Woow_podman_pi_agent_package uses, with
 # Debian's python3-aiohttp (3.8.4 on bookworm), the same runtime the host service had on .25.
 # The image is public and carries no secret: the signing key arrives at run time as the
-# podman secret woow-ingress-secret, mounted at /run/secrets/ingress-secret (see quadlet/).
+# podman secret woow-ticket-secret, mounted at /run/secrets/ticket-secret (see quadlet/).
 #
 #   podman build --format docker -t localhost/woow-auth-gateway:dev .
 
@@ -27,7 +27,7 @@ USER 10001:10001
 
 # Arguments given to the container (quadlet Exec=) are appended, so they can switch a target
 # off (--pi-port 0) or point it elsewhere; a later --secret-file overrides this one.
-ENTRYPOINT ["python3", "/usr/local/lib/woow-auth-gateway/woow_auth_gateway.py", "--secret-file", "/run/secrets/ingress-secret"]
+ENTRYPOINT ["python3", "/usr/local/lib/woow-auth-gateway/woow_auth_gateway.py", "--secret-file", "/run/secrets/ticket-secret"]
 
 # Documentation only: the quadlet runs with Network=host. 8088 Tailscale Web, 30142 Pi Agent.
 EXPOSE 8088/tcp 30142/tcp
