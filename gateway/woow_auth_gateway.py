@@ -324,10 +324,15 @@ async def run(args: argparse.Namespace) -> None:
     secret = bytes.fromhex(Path(args.secret_file).read_text(encoding="utf-8").strip())
     if len(secret) < 32:
         raise RuntimeError("Gateway secret must contain at least 32 bytes")
-    targets = (
-        Target("pi-agent", args.pi_port, args.pi_upstream, "woow_pi_session"),
-        Target("tailscale-web", args.tailscale_port, args.tailscale_upstream, "woow_ts_session"),
-    )
+    # Port 0 switches a target off: no listener, nothing proxied.
+    targets = [
+        target
+        for target in (
+            Target("pi-agent", args.pi_port, args.pi_upstream, "woow_pi_session"),
+            Target("tailscale-web", args.tailscale_port, args.tailscale_upstream, "woow_ts_session"),
+        )
+        if target.listen_port != 0
+    ]
     runners: list[web.AppRunner] = []
     for target in targets:
         runner = web.AppRunner(Gateway(secret, target, args.session_hours).app(), access_log=None)
@@ -347,11 +352,13 @@ def main() -> None:
     parser.add_argument("--secret-file", required=True)
     parser.add_argument("--listen", default="0.0.0.0")
     parser.add_argument("--pi-port", type=int, default=30142)
-    parser.add_argument("--pi-upstream", default="http://127.0.0.1:30143")
+    parser.add_argument("--pi-upstream", default="http://127.0.0.1:30141")
     parser.add_argument("--tailscale-port", type=int, default=8088)
     parser.add_argument("--tailscale-upstream", default="http://127.0.0.1:8089")
     parser.add_argument("--session-hours", type=int, default=12)
     args = parser.parse_args()
+    if args.pi_port == 0 and args.tailscale_port == 0:
+        parser.error("every target is switched off (--pi-port 0 and --tailscale-port 0)")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     asyncio.run(run(args))
 
