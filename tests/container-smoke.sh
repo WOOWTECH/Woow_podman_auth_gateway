@@ -2,6 +2,7 @@
 # tests/container-smoke.sh IMAGE: check a built image the way the hosts will run it.
 #   - runs as 10001:10001, is arm64 (EXPECT_ARCH), and carries no secret
 #   - the unit tests pass against the image's own python3-aiohttp
+#   - the image reads /run/secrets/ticket-secret, where the quadlet mounts woow-ticket-secret
 #   - with a throwaway test secret, started with the quadlet's Secret= and Exec= (base, then
 #     the H4G drop-in): every open port answers 404 without a ticket, a closed port is not
 #     listening, and switching both targets off is an error
@@ -12,7 +13,7 @@ EXPECT_ARCH=${EXPECT_ARCH:-arm64}
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 QUADLET=$REPO/quadlet/woow-auth-gateway.container
 DROPIN=$REPO/quadlet/overlays/h4g/woow-auth-gateway.container.d/pi-agent.conf
-SECRET_NAME=woow-ingress-secret
+SECRET_NAME=woow-ticket-secret
 NAME=woow-auth-gateway-smoke
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -57,6 +58,11 @@ echo "== with a test secret"
 podman secret rm "$SECRET_NAME" >/dev/null 2>&1 || true
 python3 -c 'import secrets; print(secrets.token_hex(32))' | podman secret create "$SECRET_NAME" - >/dev/null
 secret_opt=$(last_value Secret "$QUADLET")
+# The image reads the key where the quadlet mounts it; every variant below starts only if so.
+entrypoint=$(podman image inspect --format '{{join .Config.Entrypoint " "}}' "$IMAGE")
+[[ $entrypoint == *" --secret-file /run/secrets/ticket-secret"* ]] || fail "image entrypoint: $entrypoint"
+[[ $secret_opt == "$SECRET_NAME,"*",target=ticket-secret,"* ]] || fail "quadlet Secret=$secret_opt"
+echo "secret: podman secret woow-ticket-secret -> /run/secrets/ticket-secret"
 
 listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
 wait_listening() {

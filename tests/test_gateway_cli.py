@@ -28,7 +28,7 @@ TEST_SECRET = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 
 
 def sign(payload: dict) -> str:
-    """The ticket and session format woow_ingress signs (protocol v1), written out independently."""
+    """The ticket and session format woow_protected_apps signs (protocol v1), written out independently."""
     def b64(value: bytes) -> str:
         return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
 
@@ -58,7 +58,7 @@ def get(port: int, path: str, headers: dict[str, str] | None = None) -> tuple[in
         return err.code, dict(err.headers), err.read()
 
 
-# What the HA iframe card's browser sends: same host, HA frontend on 8123, embedded.
+# What the browser sends for the HA panel's iframe: same host, HA frontend on 8123, embedded.
 IFRAME_HEADERS = {
     "Referer": "http://127.0.0.1:8123/",
     "Sec-Fetch-Dest": "iframe",
@@ -110,7 +110,7 @@ class GatewayCase(unittest.TestCase):
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.secret_file = Path(tmp.name) / "ingress-secret"
+        self.secret_file = Path(tmp.name) / "ticket-secret"
         self.secret_file.write_text(TEST_SECRET + "\n", encoding="utf-8")
         self.log_file = Path(tmp.name) / "gateway.log"
 

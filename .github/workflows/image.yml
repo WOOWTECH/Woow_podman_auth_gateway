@@ -1,4 +1,5 @@
-# Image gate: build the arm64 image natively and check it the way the hosts run it.
+# Image gate: build the arm64 image natively and check it the way the hosts run it; test the
+# HA component in the HA core the hosts run and check the release asset it ships as.
 # Builds and checks only; nothing is pushed (publish.yml does that, on a version tag).
 name: image
 
@@ -23,7 +24,7 @@ jobs:
           podman --version
 
       - name: shellcheck
-        run: shellcheck tests/*.sh
+        run: shellcheck tests/*.sh ha/*.sh
 
       # Uses the hosts' generator (podman-static 6.1.1), fetched and checked by the script.
       - name: Quadlet dry-run (base and H4G drop-in)
@@ -51,3 +52,25 @@ jobs:
             echo "quadlet/woow-auth-gateway.container: Image= must be <tag>@sha256:<arm64 digest> (see README, 版本與發佈)" >&2
             exit 1
           }
+
+  ha:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # HA 2026.7 needs Python 3.14.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Install the HA test harness (HA core pinned in tests/ha/requirements.txt)
+        run: pip install -r tests/ha/requirements.txt
+
+      - name: woow_protected_apps in HA
+        run: python -m pytest -c tests/ha/pytest.ini -p no:cacheprovider -v tests/ha
+
+      # After pytest, so a __pycache__ left in the component proves the asset leaves it out.
+      - name: Release asset (custom_components/woow_protected_apps/ only)
+        run: |
+          asset=$(ha/build-asset.sh ci "$RUNNER_TEMP")
+          tests/ha-asset-check.sh "$asset"

@@ -1,0 +1,9 @@
+{
+  "domain": "woow_protected_apps",
+  "name": "WOOW Protected Web Apps",
+  "codeowners": [],
+  "dependencies": ["http", "panel_custom", "websocket_api"],
+  "documentation": "https://github.com/WOOWTECH/Woow_podman_auth_gateway",
+  "iot_class": "local_push",
+  "version": "2.0.0"
+}

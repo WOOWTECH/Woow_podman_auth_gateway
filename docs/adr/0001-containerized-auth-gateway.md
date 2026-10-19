@@ -3,6 +3,8 @@
 - 狀態：已採用（2026-10-19）
 - 來源：pipeline issue container-machines/59（2026-10-15 triage 定案）與 /60；`woow_ha_version_control` ADR-0005
 
+> 2026-10-19 註：本文的 `woow_ingress`（元件）、`woow_ingress/create_ticket`、`.woow_ingress_secret`、`woow-ingress-secret`／`ingress-secret`、iframe card 都是 `2.0.0-r1` 以前的舊名或舊做法，見 [ADR-0002](0002-ha-component-woow-protected-apps.md)。
+
 ## 背景
 
 `woow-auth-gateway` 原本只存在第 9 台參考實機 .25 的 `/opt/woow-deploy/overlays/woow-auth-gateway/`，沒有版本控制。它是 rootful 主機上的 systemd service，以 `woow-gateway` 帳號執行，用 `LoadCredential` 取得 `/opt/homeassistant/.woow_ingress_secret`，在 `:30142`（Pi Agent）與 `:8088`（Tailscale Web）前面驗證 HA `woow_ingress` 元件簽發的 HMAC ticket。兩個 target 寫死不能關，pi 的預設上游 `30143` 已過時（.25 實際以參數改成 `30141`）。HA 側的元件與卡片也沒有 repo。

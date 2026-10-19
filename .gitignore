@@ -1,5 +1,5 @@
 __pycache__/
 *.py[cod]
 # the signing key never belongs here (it lives in /opt/homeassistant and in a podman secret)
-.woow_ingress_secret
-ingress-secret
+.woow_ticket_secret
+ticket-secret
