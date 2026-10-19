@@ -21,11 +21,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y podman shellcheck
           podman --version
-          /usr/libexec/podman/quadlet -version
 
       - name: shellcheck
         run: shellcheck tests/*.sh
 
+      # Uses the hosts' generator (podman-static 6.1.1), fetched and checked by the script.
       - name: Quadlet dry-run (base and H4G drop-in)
         run: tests/quadlet-dryrun.sh
 

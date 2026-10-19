@@ -1,12 +1,25 @@
 #!/usr/bin/env bash
 # tests/quadlet-dryrun.sh: generate the systemd units the way a rootful host does, for the
 # H618 base and for base + H4G drop-in, and check the gateway arguments each one ends up with.
-# Starts no container. Needs podman's quadlet generator (apt podman 4.9.3 in CI).
+# Starts no container.
+#
+# The generator is the hosts' own: podman-static 6.1.1 (arm64), checked by sha256; its quadlet
+# is byte-identical to /usr/local/libexec/podman/quadlet on .25. apt podman 4.9.3 is no
+# substitute: its quadlet ignores .container.d drop-ins. Set QUADLET=<path> to use another.
 set -euo pipefail
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
-QUADLET=${QUADLET:-/usr/libexec/podman/quadlet}
+PODMAN_STATIC_URL=https://github.com/mgoltzsche/podman-static/releases/download/v6.1.1/podman-linux-arm64.tar.gz
+PODMAN_STATIC_SHA256=d17b17e034ee04ac416e2a8f3a46ad481ebd3ff7a62f0b90367ecdd51729f616
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
+
+if [[ -z ${QUADLET:-} ]]; then
+  curl -sSfL --retry 3 -o "$WORK/podman-static.tgz" "$PODMAN_STATIC_URL"
+  echo "$PODMAN_STATIC_SHA256  $WORK/podman-static.tgz" | sha256sum -c --quiet
+  tar xzf "$WORK/podman-static.tgz" -C "$WORK" podman-linux-arm64/usr/local/libexec/podman/quadlet
+  QUADLET=$WORK/podman-linux-arm64/usr/local/libexec/podman/quadlet
+fi
+echo "quadlet $("$QUADLET" -version)"
 
 # generate <name> [drop-in dir]: prints the generated woow-auth-gateway.service
 generate() {
