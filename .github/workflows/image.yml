@@ -1,0 +1,42 @@
+# Image gate: build the arm64 image natively and check it the way the hosts run it.
+# Builds and checks only; nothing is pushed (publish.yml does that, on a version tag).
+name: image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  arm64:
+    runs-on: ubuntu-24.04-arm      # native arm64: the H618 boxes are the only consumers
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install podman and shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman shellcheck
+          podman --version
+          /usr/libexec/podman/quadlet -version
+
+      - name: shellcheck
+        run: shellcheck tests/*.sh
+
+      - name: Quadlet dry-run (base and H4G drop-in)
+        run: tests/quadlet-dryrun.sh
+
+      # Retries cover Docker Hub and Debian mirror hiccups, not build failures.
+      - name: Build
+        run: |
+          for i in 1 2 3; do
+            podman build --format docker --platform linux/arm64 -t localhost/woow-auth-gateway:ci . && break
+            sleep 10
+          done
+          podman image exists localhost/woow-auth-gateway:ci
+
+      - name: Smoke test (user, arch, no secret, unit tests, ports)
+        run: tests/container-smoke.sh localhost/woow-auth-gateway:ci

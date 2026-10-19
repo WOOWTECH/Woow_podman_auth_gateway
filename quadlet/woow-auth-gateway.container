@@ -1,0 +1,45 @@
+# woow-auth-gateway: rootful quadlet for /etc/containers/systemd/ on H618 container machines.
+#
+# The H618 base opens Tailscale Web only (:8088 -> 127.0.0.1:8089). The H4G overlay adds Pi
+# Agent (:30142 -> 127.0.0.1:30141) with the drop-in in overlays/h4g/. Installed by
+# woow_ha_version_control's restore.sh, which also creates the podman secret; this repo ships
+# no install script.
+#
+# Network=host: both upstreams listen on host loopback, owned by other users' namespaces
+# (rootful woow-tailscale, rootless pi-web), and HA hands out ports 8088/30142 on the host.
+[Unit]
+Description=Woow auth gateway (HA ticket check for Tailscale Web and Pi Agent)
+Documentation=https://github.com/WOOWTECH/Woow_podman_auth_gateway
+# Upstreams are not ordered against: pi-web is a rootless user unit, which a system unit
+# cannot name. Until an upstream is up the gateway answers 502, then recovers by itself.
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=woow-auth-gateway
+
+# Pulled by tag and arm64 manifest digest (woow_ha_version_control ADR-0005). The tag is the
+# git tag the publish workflow built; the digest is the one its GitHub release records.
+Image=ghcr.io/woowtech/woow-auth-gateway:1.0.0-r1
+
+Network=host
+
+# Created by restore.sh from /opt/homeassistant/.woow_ingress_secret. Rotate both together.
+Secret=woow-ingress-secret,type=mount,target=ingress-secret,uid=10001,gid=10001,mode=0400
+
+# Base: Tailscale Web only. The drop-in replaces this line.
+Exec=--pi-port 0
+
+ReadOnly=true
+NoNewPrivileges=true
+DropCapability=all
+
+Label=io.woowtech.app=woow-auth-gateway
+
+[Service]
+Restart=always
+RestartSec=3
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
