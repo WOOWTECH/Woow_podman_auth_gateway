@@ -20,7 +20,7 @@ ContainerName=woow-auth-gateway
 
 # Pulled by tag and arm64 manifest digest (woow_ha_version_control ADR-0005). The tag is the
 # git tag the publish workflow built; the digest is the one its GitHub release records.
-Image=ghcr.io/woowtech/woow-auth-gateway:1.0.0-r1
+Image=ghcr.io/woowtech/woow-auth-gateway:1.0.0-r1@sha256:554af0143cc5b7f8111a964f5f527d0bd1ab8d3a7600446fe30d03693257fb2b
 
 Network=host
 
