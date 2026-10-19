@@ -11,6 +11,7 @@ import hmac
 import json
 import logging
 import secrets
+import signal
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -340,8 +341,14 @@ async def run(args: argparse.Namespace) -> None:
         await web.TCPSite(runner, args.listen, target.listen_port).start()
         runners.append(runner)
         _LOGGER.info("Protecting %s on %s:%d", target.name, args.listen, target.listen_port)
+    # As a container's PID 1 an unhandled SIGTERM is ignored; stop cleanly on it instead.
+    stop = asyncio.Event()
     try:
-        await asyncio.Event().wait()
+        asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, stop.set)
+    except NotImplementedError:  # Windows
+        pass
+    try:
+        await stop.wait()
     finally:
         for runner in runners:
             await runner.cleanup()

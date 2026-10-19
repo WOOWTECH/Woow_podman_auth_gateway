@@ -86,6 +86,13 @@ run_variant() {
       expect_404 "$port"
     fi
   done
+  # PID 1 must act on SIGTERM: a stop that waits for the kill timeout slows every restart.
+  local started=$SECONDS code
+  podman stop -t 10 "$NAME" >/dev/null
+  code=$(podman inspect --format '{{.State.ExitCode}}' "$NAME")
+  ((SECONDS - started < 5)) || fail "stop took $((SECONDS - started))s: SIGTERM was not handled"
+  [[ $code == 0 ]] || fail "stopped with exit code $code, expected 0"
+  echo "stop -> exit 0 in $((SECONDS - started))s"
   podman rm -f "$NAME" >/dev/null
 }
 
