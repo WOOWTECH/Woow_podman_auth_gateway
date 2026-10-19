@@ -58,7 +58,7 @@ def get(port: int, path: str, headers: dict[str, str] | None = None) -> tuple[in
         return err.code, dict(err.headers), err.read()
 
 
-# What the HA iframe card's browser sends: same host, HA frontend on 8123, embedded.
+# What the browser sends for the HA panel's iframe: same host, HA frontend on 8123, embedded.
 IFRAME_HEADERS = {
     "Referer": "http://127.0.0.1:8123/",
     "Sec-Fetch-Dest": "iframe",

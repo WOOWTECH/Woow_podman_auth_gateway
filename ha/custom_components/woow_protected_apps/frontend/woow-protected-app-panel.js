@@ -3,6 +3,8 @@
 // The toolbar is drawn here, not by HA, so it carries only HA's menu button (shown when the
 // sidebar is collapsed or the screen is narrow) and the app's name. Below it, an iframe opens
 // the app through woow-auth-gateway with a one-use ticket from HA.
+const RETRY_MS = 10000;
+
 class WoowProtectedAppPanel extends HTMLElement {
   constructor() {
     super();
@@ -49,6 +51,8 @@ class WoowProtectedAppPanel extends HTMLElement {
 
   async _start() {
     if (!this._hass || !this._panel || this._started) return;
+    // After a failure, retry on a later hass update, but not on every one of them.
+    if (Date.now() - (this._failedAt || 0) < RETRY_MS) return;
     this._started = true;
     const target = this._panel.config.target;
     const content = this.shadowRoot.querySelector(".content");
@@ -69,8 +73,8 @@ class WoowProtectedAppPanel extends HTMLElement {
       iframe.referrerPolicy = "origin";
       content.replaceChildren(iframe);
     } catch (error) {
-      // Retried on HA's next hass update.
       this._started = false;
+      this._failedAt = Date.now();
       const message = error?.message || String(error);
       content.querySelector(".status").textContent = `Home Assistant 驗證失敗：${message}`;
     }

@@ -22,9 +22,13 @@ DOMAIN = "woow_protected_apps"
 SECRET_FILE = ".woow_ticket_secret"
 PANEL_ELEMENT = "woow-protected-app-panel"
 PANEL_URL = f"/{DOMAIN}/{PANEL_ELEMENT}.js"
+# Ticket format v1 is unchanged since 1.0.0; protocol 2.0.0 renamed the HA side (ADR-0002).
+TICKET_SECONDS = 45
 
 
-class Setup(NamedTuple):
+class ProtectedAppsData(NamedTuple):
+    """hass.data[DOMAIN]: the signing key and the targets this machine enables."""
+
     secret: bytes
     targets: list[str]
 
@@ -96,7 +100,7 @@ def ws_create_ticket(
         "target": msg["target"],
         "uid": connection.user.id,
         "iat": now,
-        "exp": now + 45,
+        "exp": now + TICKET_SECONDS,
         "jti": secrets.token_urlsafe(24),
     }
     connection.send_result(
@@ -104,7 +108,7 @@ def ws_create_ticket(
         {
             "ticket": _sign(hass.data[DOMAIN].secret, payload),
             "port": TARGETS[msg["target"]].port,
-            "expires_in": 45,
+            "expires_in": TICKET_SECONDS,
         },
     )
 
@@ -116,7 +120,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     secret = bytes.fromhex(secret_hex.strip())
     if len(secret) < 32:
         raise ValueError("WOOW ticket secret must contain at least 32 bytes")
-    hass.data[DOMAIN] = Setup(secret, config[DOMAIN]["targets"])
+    hass.data[DOMAIN] = ProtectedAppsData(secret, config[DOMAIN]["targets"])
     websocket_api.async_register_command(hass, ws_create_ticket)
 
     await hass.http.async_register_static_paths(

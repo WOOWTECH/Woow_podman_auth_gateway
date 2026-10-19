@@ -61,7 +61,7 @@ secret_opt=$(last_value Secret "$QUADLET")
 # The image reads the key where the quadlet mounts it; every variant below starts only if so.
 entrypoint=$(podman image inspect --format '{{join .Config.Entrypoint " "}}' "$IMAGE")
 [[ $entrypoint == *" --secret-file /run/secrets/ticket-secret"* ]] || fail "image entrypoint: $entrypoint"
-[[ $secret_opt == "woow-ticket-secret,"*",target=ticket-secret,"* ]] || fail "quadlet Secret=$secret_opt"
+[[ $secret_opt == "$SECRET_NAME,"*",target=ticket-secret,"* ]] || fail "quadlet Secret=$secret_opt"
 echo "secret: podman secret woow-ticket-secret -> /run/secrets/ticket-secret"
 
 listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }

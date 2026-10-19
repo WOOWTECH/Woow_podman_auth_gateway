@@ -32,8 +32,8 @@ async def _create_ticket(hass_ws_client, target: str, **client_kwargs) -> dict:
     return await client.receive_json()
 
 
-async def _panels(hass_ws_client) -> dict:
-    client = await hass_ws_client()
+async def _panels(hass_ws_client, **client_kwargs) -> dict:
+    client = await hass_ws_client(**client_kwargs)
     await client.send_json_auto_id({"type": "get_panels"})
     msg = await client.receive_json()
     assert msg["success"], msg
@@ -90,13 +90,10 @@ async def test_non_admins_do_not_see_the_panels(
         hass, DOMAIN, {DOMAIN: {"targets": ["pi-agent", "tailscale-web"]}}
     )
 
-    client = await hass_ws_client(access_token=hass_read_only_access_token)
-    await client.send_json_auto_id({"type": "get_panels"})
-    msg = await client.receive_json()
+    panels = await _panels(hass_ws_client, access_token=hass_read_only_access_token)
 
-    assert msg["success"], msg
-    assert "pi-agent" not in msg["result"]
-    assert "tailscale-web" not in msg["result"]
+    assert "pi-agent" not in panels
+    assert "tailscale-web" not in panels
 
 
 async def test_an_admin_gets_a_ticket_the_gateway_accepts(
