@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import http.server
 import json
+import signal
 import socket
 import subprocess
 import sys
@@ -156,6 +157,17 @@ class PortsTest(GatewayCase):
         log = proc.log()
         self.assertIn(f"Protecting pi-agent on 127.0.0.1:{pi}", log)
         self.assertNotIn("Protecting tailscale-web", log)
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX signals")
+    def test_sigterm_stops_cleanly(self) -> None:
+        # In a container the gateway is PID 1, where an unhandled SIGTERM is ignored and
+        # every stop waits for podman's kill timeout.
+        port = free_port()
+        proc = self.start("--pi-port", "0", "--tailscale-port", str(port))
+        wait_listening(port, proc)
+        proc.send_signal(signal.SIGTERM)
+        self.assertEqual(proc.wait(timeout=5), 0)
+        self.assertFalse(listening(port))
 
     def test_both_ports_0_is_an_error(self) -> None:
         proc = self.start("--pi-port", "0", "--tailscale-port", "0")

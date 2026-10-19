@@ -1,0 +1,53 @@
+# Image gate: build the arm64 image natively and check it the way the hosts run it.
+# Builds and checks only; nothing is pushed (publish.yml does that, on a version tag).
+name: image
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  arm64:
+    runs-on: ubuntu-24.04-arm      # native arm64: the H618 boxes are the only consumers
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install podman and shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman shellcheck
+          podman --version
+
+      - name: shellcheck
+        run: shellcheck tests/*.sh
+
+      # Uses the hosts' generator (podman-static 6.1.1), fetched and checked by the script.
+      - name: Quadlet dry-run (base and H4G drop-in)
+        run: tests/quadlet-dryrun.sh
+
+      # Retries cover Docker Hub and Debian mirror hiccups, not build failures.
+      - name: Build
+        run: |
+          for i in 1 2 3; do
+            podman build --format docker --platform linux/arm64 -t localhost/woow-auth-gateway:ci . && break
+            sleep 10
+          done
+          podman image exists localhost/woow-auth-gateway:ci
+
+      - name: Smoke test (user, arch, no secret, unit tests, ports)
+        run: tests/container-smoke.sh localhost/woow-auth-gateway:ci
+
+      # Last, so a release PR (red here until it pins the digest) still runs every check above.
+      # Hosts pull by tag and arm64 manifest digest. A release PR is tagged and published
+      # from its branch first (publish.yml), then pins the digest here, so main never
+      # carries a tag-only Image=.
+      - name: The quadlet pins the image by tag and digest
+        run: |
+          grep -Eq '^Image=ghcr\.io/woowtech/woow-auth-gateway:[0-9]+\.[0-9]+\.[0-9]+-r[0-9]+@sha256:[0-9a-f]{64}$' quadlet/woow-auth-gateway.container || {
+            echo "quadlet/woow-auth-gateway.container: Image= must be <tag>@sha256:<arm64 digest> (see README, 版本與發佈)" >&2
+            exit 1
+          }
