@@ -77,7 +77,7 @@ woow_protected_apps:
 
 ## Tailscale Web 必須聽 `127.0.0.1:8089`
 
-gateway 自己佔 `:8088`，轉給 `127.0.0.1:8089`。`woow-tailscale` 的 quadlet 要設 `TS_WEB_LISTEN=127.0.0.1:8089`（`Woow_podman_vpn_tailscale_package` 1.102.3-r2 起是預設）。Tailscale Web 是沒有驗證、可寫入的管理介面，絕不能聽在 loopback 以外。舊版聽 `127.0.0.1:8088` 會和 gateway 撞埠，gateway 起不來。
+gateway 自己佔 `:8088`，轉給 `127.0.0.1:8089`。H618 的 Tailscale 裝在主機上（`woow_ha_version_control` ADR-0006，待演練），由 `tailscale-web.service` 聽這個位址；其他機器若用 `woow-tailscale` 容器，要設 `TS_WEB_LISTEN=127.0.0.1:8089`（`Woow_podman_vpn_tailscale_package` 1.102.3-r2 起是預設）。Tailscale Web 是沒有驗證、可寫入的管理介面，絕不能聽在 loopback 以外。舊版聽 `127.0.0.1:8088` 會和 gateway 撞埠，gateway 起不來。
 
 ## 新增 target 要同步改的四個地方
 
