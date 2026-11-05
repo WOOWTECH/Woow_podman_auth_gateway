@@ -6,7 +6,7 @@
 # no install script.
 #
 # Network=host: both upstreams listen on host loopback, owned by other users' namespaces
-# (native tailscale-web.service, rootless pi-web), and HA hands out ports 8088/30142 on the host.
+# (native tailscale-web.service, native pi-web under pi), and HA hands out ports 8088/30142 on the host.
 [Unit]
 Description=Woow auth gateway (HA ticket check for Tailscale Web and Pi Agent)
 Documentation=https://github.com/WOOWTECH/Woow_podman_auth_gateway
