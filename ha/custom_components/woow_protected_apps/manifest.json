@@ -5,5 +5,5 @@
   "dependencies": ["http", "panel_custom", "websocket_api"],
   "documentation": "https://github.com/WOOWTECH/Woow_podman_auth_gateway",
   "iot_class": "local_push",
-  "version": "2.0.0"
+  "version": "2.1.0"
 }

@@ -24,7 +24,22 @@ env:
   IMAGE: ghcr.io/woowtech/woow-auth-gateway
 
 jobs:
+  ha:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r tests/ha/requirements.txt
+      - run: python -m pytest -c tests/ha/pytest.ini -p no:cacheprovider -q tests/ha
+      - run: python -m pytest -p no:cacheprovider -q tests/ingress
+      - run: node --test tests/frontend/*.cjs
   arm64:
+    needs: ha
     runs-on: ubuntu-24.04-arm      # native arm64: the H618 boxes are the only consumers
     steps:
       - uses: actions/checkout@v4
