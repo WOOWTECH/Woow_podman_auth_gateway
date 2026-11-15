@@ -26,7 +26,7 @@ mkdir "$WORK/unpacked"
 tar xzf "$TARBALL" -C "$WORK/unpacked"
 diff -r --exclude=__pycache__ "$REPO/ha/$COMPONENT" "$WORK/unpacked/$COMPONENT" \
   || fail "the asset differs from ha/$COMPONENT"
-for f in __init__.py manifest.json frontend/woow-protected-app-panel.js; do
+for f in __init__.py ingress.py manifest.json frontend/woow-protected-app-panel.js frontend/ingress-bridge.js; do
   [[ -f $WORK/unpacked/$COMPONENT/$f ]] || fail "$f missing"
 done
 

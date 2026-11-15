@@ -106,6 +106,7 @@ async def test_an_admin_gets_a_ticket_the_gateway_accepts(
     msg = await _create_ticket(hass_ws_client, "pi-agent")
 
     assert msg["success"], msg
+    assert msg["result"]["url"].startswith("/api/woow_protected_apps/pi-agent/_launch?ticket=")
     assert msg["result"]["port"] == 30142
     assert msg["result"]["expires_in"] == 45
     gateway = _gateway()
@@ -153,3 +154,19 @@ async def test_the_panel_module_is_served_where_the_panels_load_it(
 
     assert resp.status == 200
     assert 'customElements.define("woow-protected-app-panel"' in await resp.text()
+
+
+async def test_ingress_launch_uses_ha_http_and_rejects_ticket_replay(
+    hass: HomeAssistant, secret_file, hass_ws_client, hass_client
+) -> None:
+    """Exercise actual HA view/CORS registration, not just the fake HTTP harness."""
+    assert await async_setup_component(hass, DOMAIN, {DOMAIN: None})
+    client = await hass_client()
+    root = '/api/woow_protected_apps/tailscale-web/'
+    assert (await client.get(root)).status == 401
+    ticket = (await _create_ticket(hass_ws_client, 'tailscale-web'))['result']['url']
+    response = await client.get(ticket, allow_redirects=False)
+    assert response.status == 303
+    assert response.headers['Location'] == root
+    assert 'HttpOnly' in response.headers['Set-Cookie']
+    assert (await client.get(ticket, allow_redirects=False)).status == 401

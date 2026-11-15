@@ -61,11 +61,7 @@ class WoowProtectedAppPanel extends HTMLElement {
         type: "woow_protected_apps/create_ticket",
         target,
       });
-      const url = new URL(window.location.href);
-      url.port = String(result.port);
-      url.pathname = "/auth/launch";
-      url.search = new URLSearchParams({ ticket: result.ticket }).toString();
-      url.hash = "";
+      const url = new URL(result.url, window.location.origin);
       const iframe = document.createElement("iframe");
       iframe.src = url.toString();
       iframe.title = this._panel.title || target;

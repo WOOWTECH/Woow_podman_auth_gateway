@@ -5,21 +5,23 @@
 - **`woow-auth-gateway`**（容器）：檢查 Home Assistant 簽發的一次性 ticket，通過後才把請求轉給只聽 loopback 的上游。
 - **`woow_protected_apps`**（HA 元件，`ha/`）：簽發 ticket，並把每個啟用的應用註冊成 HA 側邊欄的 panel。
 
-它**和 HA ingress 不是同一件事**。HA ingress 是 Supervisor 的 add-on 機制，由 HA 本身代理 add-on 的網頁；容器式機器沒有 Supervisor，本機制是另外做的：HA 只簽發 ticket，瀏覽器直接連 gateway 的埠（`:8088`、`:30142`），由 gateway 驗證並代理。（`2.0.0-r1` 以前元件的舊名是 `woow_ingress`，見 ADR-0002。）
+從 2.1.0 起，側邊欄使用 HA Core 自訂整合提供的同網域 ingress：瀏覽器只連 HA 網址，HA 代理 loopback 上游，因此 Cloudflare Tunnel 只需轉發 8123。它不需要 Supervisor。原本的 gateway 容器與 ticket/port 回應保留給舊版客戶端；新版 panel 使用回應中的相對 `url`。（`2.0.0-r1` 以前元件的舊名是 `woow_ingress`，見 ADR-0002。）
 
 設計決定見 [`docs/adr/`](docs/adr/)：0001 容器化；0002 HA 元件改名、改用 panel、協定版本的範圍與 release asset。
 
 ## 流程
 
 1. `woow_protected_apps` 依 `configuration.yaml` 的 `targets:` 為每個應用註冊一個只限 admin 的側邊欄 panel（`url_path` 等於 target 名稱）。panel 自己畫 toolbar，只有 HA 的選單按鈕與應用名稱。不用 Lovelace dashboard，因為 dashboard 的 toolbar 由 HA 繪製，HA 的按鈕藏不掉。
-2. 管理員打開 panel，panel 以 WebSocket 呼叫 `woow_protected_apps/create_ticket`（只限 admin，只接受啟用的 target），拿到 45 秒、一次性的 ticket 與目標埠。
-3. panel 在 toolbar 下方以 iframe 開 `http://<同一主機>:<埠>/auth/launch?ticket=…`。gateway 只接受 Referer 為同主機 `:8123`、非頂層導覽的請求，驗證 HMAC、時效與 `jti`（防重放紀錄只在記憶體，重啟後清空），換發 HttpOnly 的簽章 session cookie（預設 12 小時）。
-4. 之後的請求帶 cookie，gateway 代理 HTTP 與 WebSocket 到上游；HTML 回應加 `frame-ancestors <HA 來源>:8123`。直接開、頂層導覽、跨站、沒有或偽造 ticket 的請求一律回 **404**。
+2. 管理員透過 HA WebSocket 呼叫 `woow_protected_apps/create_ticket`，取得 45 秒、一次性的 ingress launch URL。
+3. panel 的 iframe 開啟此同網域 URL，交換限於該應用路徑、有效一小時的 HttpOnly session cookie。HTTPS 下帶 Secure，並使用 SameSite=Strict。
+4. HA 在代理每個 HTTP 請求／WebSocket 握手前檢查 session 與管理員狀態，將請求送到固定 loopback 上游。未認證為 401、跨來源為 403、未知 target 為 404。這些狀態與舊版 gateway 的統一 404 規則不同。
 
-| Target | gateway（對外） | 上游（loopback） | cookie | 出現在 |
-|---|---:|---|---|---|
-| `tailscale-web` | `:8088` | `127.0.0.1:8089` | `woow_ts_session` | H618 基底 |
-| `pi-agent` | `:30142` | `127.0.0.1:30141` | `woow_pi_session` | H4G 疊加層 |
+| Target | HA ingress path | 上游（loopback） | 出現在 |
+|---|---|---|---|
+| `tailscale-web` | `/api/woow_protected_apps/tailscale-web/` | `127.0.0.1:8089` | H618 基底（H2G/H4G） |
+| `pi-agent` | `/api/woow_protected_apps/pi-agent/` | `127.0.0.1:30141` | H4G 疊加層 |
+
+舊 gateway 仍在 `:8088`／`:30142` 使用原本的 HMAC ticket 與 12 小時簽章 cookie；Cloudflare 新版側邊欄不經過這兩個埠。
 
 ## 內容
 
@@ -77,7 +79,7 @@ woow_protected_apps:
 
 ## Tailscale Web 必須聽 `127.0.0.1:8089`
 
-gateway 自己佔 `:8088`，轉給 `127.0.0.1:8089`。H618 的 Tailscale 裝在主機上（`woow_ha_version_control` ADR-0006，待演練），由 `tailscale-web.service` 聽這個位址；其他機器若用 `woow-tailscale` 容器，要設 `TS_WEB_LISTEN=127.0.0.1:8089`（`Woow_podman_vpn_tailscale_package` 1.102.3-r2 起是預設）。Tailscale Web 是沒有驗證、可寫入的管理介面，絕不能聽在 loopback 以外。舊版聽 `127.0.0.1:8088` 會和 gateway 撞埠，gateway 起不來。
+gateway 自己佔 `:8088`，轉給 `127.0.0.1:8089`。H618 的 Tailscale 裝在主機上（`woow_ha_version_control` ADR-0006，待演練），由 `tailscale-web.service` 聽這個位址；其他機器若用 `woow-tailscale` 容器，要設 `TS_WEB_LISTEN=127.0.0.1:8089`（`Woow_podman_vpn_tailscale_package` 1.102.3-r2 起是預設）。Tailscale Web 的節點登入介面沒有額外平台驗證，必須只聽 loopback；登入後完整管理仍受 Tailscale 原生權限限制。舊版聽 `127.0.0.1:8088` 會和 gateway 撞埠，gateway 起不來。
 
 ## 新增 target 要同步改的四個地方
 
@@ -122,3 +124,55 @@ tests/ha-asset-check.sh "$(ha/build-asset.sh dev /tmp)"
 tests/quadlet-dryrun.sh                    # 需要 podman 的 quadlet generator
 tests/container-smoke.sh <image>           # 會用到本機 :8088 與 :30142，只在 CI 跑
 ```
+
+
+## HA 同網域 ingress（2.1.0）
+
+側邊欄透過 HA 的 `/api/woow_protected_apps/pi-agent/` 與
+`/api/woow_protected_apps/tailscale-web/` 代理本機服務。Cloudflare 只需將 HA
+網域轉到 HA 的 8123，無須另開 Pi Agent 或 Tailscale 連接埠。
+這是 Core 自訂整合提供的代理，不依賴 HAOS Supervisor。
+
+HA 必須能連到本機 `127.0.0.1:30141`（Pi Agent）與
+`127.0.0.1:8089`（Tailscale Web）；目前部署使用 host networking。
+HTTPS 反向代理需正確傳遞 forwarded headers，並在 HA 設定可信任代理。
+
+管理員從已認證的 HA WebSocket API 取得 45 秒、一次性啟動票券，
+換取限於該應用路徑的 HttpOnly / SameSite=Strict session cookie；
+HTTPS 下另加 Secure。每次請求重新檢查使用者仍為有效管理員；已建立的 WebSocket 與 SSE
+每 15 秒內重查撤權／登出，並在 session 到期時關閉。
+Session 一小時到期，重新開啟側邊欄頁面可取得新票券。
+HTTP、SSE、WebSocket 走同一代理；HA Authorization 不會傳給後端。
+
+前端 bridge 會改寫應用的根路徑資源與 API 請求。此相容層已針對
+目前的 Pi Web 與 Tailscale Web 測試；更新應用後需再次驗證。
+Tailscale 本身的登入流程仍保留。
+
+可獨立執行 `python -m pytest tests/ingress` 驗證權限、票券重放、
+跨應用隔離、跨來源拒絕、串流與 WebSocket。此測試以假的 HA user store
+搭配真的 aiohttp transport 執行，請與 `tests/ha` 分開啟動 pytest。
+
+Tailscale Web 1.104.5 啟動時必須加上
+`--prefix /api/woow_protected_apps/tailscale-web`。非 CGI 模式的 HTTP 上游
+仍收到去掉 prefix 的路徑；這個旗標讓登入後的前端 Router 使用正確的 base。
+沒有它時，未登入畫面正常，但登入 tailnet 後會出現 `Page not found`。
+原生 `tailscale web --readonly=false` 仍是 LoginServerMode：CF 可顯示裝置、
+登入節點及瀏覽設定，但完整管理模式需要 tailnet 的來源身分與授權，
+不能宣稱 HA 管理員驗證已取代 Tailscale 的管理授權。
+
+Pi Web 的 Next.js 會將根路徑移除尾端斜線；bridge 必須將有／無斜線的
+掛載根視為同一路徑，否則選擇專案或對話時會重複 prefix 而回傳 404。
+CSS custom property 的圖示 URL 也需改寫。`node --test tests/frontend/*.cjs`
+涵蓋這兩個由 CF 實際操作發現的回歸案例。
+
+同網域 iframe 的兩個應用視為受信任的管理程式：其 JavaScript 與 HA 共用
+origin，可存取同來源的父頁面與瀏覽器儲存。路徑 cookie 隔離防止憑證被
+代理到錯誤後端，並不提供惡意應用程式之間的瀏覽器安全隔離；不要把任意
+第三方網頁加入 target。若需要互不信任的應用隔離，應改用獨立 origin。
+
+2026-11-15 的 H4G 實機 CF 驗收（HA 2026.7.2／Pi Web 0.10.0／Tailscale 1.104.5）：
+實際瀏覽器已驗證專案選擇、既有對話開啟與重新整理、新對話與切回、檔案
+瀏覽與圖示、側邊欄往返、Tailscale 詳情與重新整理、SSE，以及兩個 ingress
+未登入回 401。另以既有模型送出一筆短提示並收到回覆。這不代表 Tailscale
+完整管理、iOS 推播、所有外部模型／MCP 服務均已驗收；H2G 乾淨實機還原
+也需另外演練。

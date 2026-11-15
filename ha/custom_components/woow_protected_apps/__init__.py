@@ -15,6 +15,7 @@ import voluptuous as vol
 
 from homeassistant.components import panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
+from .ingress import Ingress
 from homeassistant.core import HomeAssistant, callback
 import homeassistant.helpers.config_validation as cv
 
@@ -31,6 +32,7 @@ class ProtectedAppsData(NamedTuple):
 
     secret: bytes
     targets: list[str]
+    ingress: Ingress
 
 
 class Target(NamedTuple):
@@ -108,6 +110,7 @@ def ws_create_ticket(
         {
             "ticket": _sign(hass.data[DOMAIN].secret, payload),
             "port": TARGETS[msg["target"]].port,
+            "url": hass.data[DOMAIN].ingress.issue(msg["target"], connection.user.id),
             "expires_in": TICKET_SECONDS,
         },
     )
@@ -120,7 +123,10 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     secret = bytes.fromhex(secret_hex.strip())
     if len(secret) < 32:
         raise ValueError("WOOW ticket secret must contain at least 32 bytes")
-    hass.data[DOMAIN] = ProtectedAppsData(secret, config[DOMAIN]["targets"])
+    bridge = await hass.async_add_executor_job((Path(__file__).parent / "frontend" / "ingress-bridge.js").read_text, "utf-8")
+    ingress = Ingress(hass, config[DOMAIN]["targets"], bridge)
+    hass.http.register_view(ingress)
+    hass.data[DOMAIN] = ProtectedAppsData(secret, config[DOMAIN]["targets"], ingress)
     websocket_api.async_register_command(hass, ws_create_ticket)
 
     await hass.http.async_register_static_paths(
@@ -138,7 +144,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             webcomponent_name=PANEL_ELEMENT,
             sidebar_title=target.title,
             sidebar_icon=target.icon,
-            module_url=PANEL_URL,
+            module_url=PANEL_URL + "?v=2.1.0-ingress",
             config={"target": name},
             require_admin=True,
         )
